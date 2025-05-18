@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}வாடிக்கையாளர் பதிவு{% endblock %}
+{% block content %}
+<h2>புதிய வாடிக்கையாளர் பதிவு</h2>
+<form method="POST" enctype="multipart/form-data">
+  <div class="mb-3">
+    <label for="username" class="form-label">Username:</label>
+    <input id="username" class="form-control" type="text" name="username" required />
+  </div>
+  <div class="mb-3">
+    <label for="password" class="form-label">Password:</label>
+    <input id="password" class="form-control" type="password" name="password" required />
+  </div>
+  <div class="mb-3">
+    <label for="mobile" class="form-label">Mobile Number:</label>
+    <input id="mobile" class="form-control" type="tel" name="mobile" required pattern="[0-9]{10}" placeholder="10 digit mobile number" />
+  </div>
+  <div class="mb-3">
+    <label for="files" class="form-label">Upload Files (multiple allowed):</label>
+    <input id="files" class="form-control" type="file" name="files" multiple />
+  </div>
+  <button class="btn btn-primary" type="submit">Register</button>
+</form>
+<p class="mt-3">இப்போது <a href="{{ url_for('customer_login') }}">Login</a செய்யவும்.</p>
+{% endblock %}

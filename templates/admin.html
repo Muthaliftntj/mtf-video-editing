@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8" />
+<title>Admin Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body class="container py-4">
+    <h1>Admin Dashboard</h1>
+    <nav>
+        <a href="{{ url_for('upload') }}">Upload File</a> |
+        <a href="{{ url_for('upload_cover') }}">Change Cover Photo</a> |
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <hr />
+    <h3>Uploaded Files</h3>
+    <ul>
+        {% for file in files %}
+        <li>
+            {{ file }}
+            <form method="POST" action="{{ url_for('delete_file', filename=file) }}" style="display:inline;">
+                <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+            </form>
+        </li>
+        {% else %}
+        <p>Files இல்லை.</p>
+        {% endfor %}
+    </ul>
+
+    <hr />
+    <h3>Customer Requests</h3>
+    <ul>
+        {% for req in requests %}
+        <li><strong>{{ req.customer_id }}:</strong> {{ req.text }}</li>
+        {% else %}
+        <p>Requests இல்லை.</p>
+        {% endfor %}
+    </ul>
+</body>
+</html>
