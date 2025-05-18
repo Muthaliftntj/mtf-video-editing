@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <title>MTF Video Editing சேவை</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>MTF Video Editing - Moments To Frame</h1>
+        <p>உணர்வுகளை ஒளிக்காட்சியாக மாற்றுகிறோம்</p>
+        <nav>
+            <a href="{{ url_for('home') }}">முகப்பு</a> |
+            <a href="{{ url_for('login') }}">Admin Login</a>
+        </nav>
+    </header>
+
+    <section>
+        <h2>என் சேவைகள்</h2>
+        <ul>
+            <li>வீடியோ காட்சி திருத்தம்</li>
+            <li>Color Grading</li>
+            <li>விளம்பரங்கள்</li>
+            <li>இசையில்லா விளம்பரங்கள் / Promo Videos</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>பதிவேற்றப்பட்ட கோப்புகள்</h2>
+        <div class="file-gallery">
+            <ul>
+                {% for file in files %}
+                    {% set ext = file.rsplit('.', 1)[1].lower() %}
+                    <li>
+                        {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'] %}
+                            <img src="{{ url_for('static', filename='uploads/' ~ file) }}" width="200"><br>
+                        {% elif ext in ['mp4', 'mov', 'avi'] %}
+                            <video width="320" height="240" controls>
+                                <source src="{{ url_for('static', filename='uploads/' ~ file) }}">
+                            </video><br>
+                        {% elif ext in ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'] %}
+                            📄 <a href="{{ url_for('static', filename='uploads/' ~ file) }}" target="_blank">{{ file }}</a><br>
+                        {% else %}
+                            ❓ <a href="{{ url_for('static', filename='uploads/' ~ file) }}" target="_blank">{{ file }}</a><br>
+                        {% endif %}
+                    </li>
+                {% else %}
+                    <p>காண்பிக்க எந்த கோப்பும் இல்லை.</p>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+
+    <footer>
+        <p>தொடர்பு: mtfavn@gmail.com</p>
+    </footer>
+</body>
+</html>
