@@ -1,0 +1,76 @@
+<!-- templates/admin/dashboard.html -->
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Admin Dashboard</h2>
+    
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Pending Reporters Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">ஒப்புதல் பெறாத நிருபர்கள்</h5>
+        </div>
+        <div class="card-body">
+            {% if pending_reporters %}
+                <ul class="list-group">
+                    {% for reporter in pending_reporters %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ reporter.username }} ({{ reporter.mobile }})
+                            <a href="{{ url_for('approve_reporter', reporter_id=reporter.id) }}" class="btn btn-sm btn-success">ஒப்புதல் அளிக்க</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-muted">ஒப்புதல் பெறாத நிருபர்கள் இல்லை.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- News Management Table -->
+    {% if news_list %}
+        <table class="table table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Reporter</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for news in news_list %}
+                <tr>
+                    <td>{{ news.title }}</td>
+                    <td>{{ news.reporter.username }}</td>
+                    <td>{{ news.date_posted.strftime('%Y-%m-%d') if news.date_posted else 'N/A' }}</td>
+                    <td>
+                        {% if news.approved %}
+                            <span class="badge bg-success">Approved</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('approve_news', news_id=news.id) }}" class="btn btn-success btn-sm">Approve</a>
+                        <a href="{{ url_for('edit_news', news_id=news.id) }}" class="btn btn-warning btn-sm">Edit</a>
+                        <a href="{{ url_for('delete_news', news_id=news.id) }}" class="btn btn-danger btn-sm">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No news submissions yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

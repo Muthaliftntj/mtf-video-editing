@@ -1,50 +1,85 @@
 <!DOCTYPE html>
 <html lang="ta">
 <head>
-<meta charset="UTF-8" />
-<title>MTF Video Editing - Home</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-<style>
-    body { padding: 20px; }
-    .file-list img, .file-list video { max-width: 200px; max-height: 150px; margin: 10px; }
-</style>
+    <meta charset="UTF-8">
+    <title>நடுநிலைச் சமுதாயம்</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+        .news-card {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .news-card:hover {
+            transform: scale(1.02);
+        }
+        .navbar-brand {
+            font-weight: bold;
+            color: #dc3545 !important;
+        }
+    </style>
 </head>
 <body>
-    {% if cover_photo %}
-    <div>
-        <img src="{{ url_for('static', filename=cover_photo) }}" alt="Cover Photo" style="max-width: 100%; height:auto;"/>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4">
+    <a class="navbar-brand" href="#">நடுநிலைச் சமுதாயம்</a>
+    <div class="ms-auto">
+        <a href="/reporter-login" class="btn btn-outline-light btn-sm me-2">Reporter Login</a>
+        <a href="/admin-login" class="btn btn-danger btn-sm">Admin Login</a>
     </div>
-    {% endif %}
-    <h1>MTF Video Editing - Moments To Frame</h1>
-    <p>உணர்வுகளை ஒளிக்காட்சியாக மாற்றுகிறோம்</p>
-    <nav>
-        <a href="{{ url_for('home') }}">முகப்பு</a> |
-        <a href="{{ url_for('customer_login') }}">Customer Login</a> |
-        <a href="{{ url_for('customer_register') }}">Register</a> | |
-        <a href="{{ url_for('login') }}">Admin Login</a>
-    </nav>
+</nav>
 
-    <hr />
-
-    <h2>Uploaded Files</h2>
-    <div class="file-list d-flex flex-wrap">
-        {% for file in files %}
-            {% set ext = file.rsplit('.', 1)[1].lower() %}
-            <div class="me-3 mb-3">
-                {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'] %}
-                    <img src="{{ url_for('static', filename='uploads/' ~ file) }}" alt="{{ file }}">
-                {% elif ext in ['mp4', 'mov', 'avi'] %}
-                    <video controls>
-                        <source src="{{ url_for('static', filename='uploads/' ~ file) }}" type="video/{{ ext }}">
-                        Your browser does not support the video tag.
-                    </video>
-                {% else %}
-                    <p>{{ file }}</p>
-                {% endif %}
+<div class="container my-5">
+    <h2 class="mb-4 text-center">நடுநிலைச் செய்திகள்</h2>
+    <div class="row">
+        {% for news in news_items %}
+            <div class="col-md-4 mb-4">
+                <div class="card news-card" onclick="viewNews('{{ news.id }}')">
+                    {% if news.filename %}
+                        {% if news.filename.endswith('.mp4') or news.filename.endswith('.mov') or news.filename.endswith('.avi') %}
+                            <video class="card-img-top" controls>
+                                <source src="{{ url_for('static', filename='uploads/' ~ news.filename) }}">
+                            </video>
+                        {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' ~ news.filename) }}" class="card-img-top" alt="செய்தி படம்">
+                        {% endif %}
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ news.title }}</h5>
+                        <p class="card-text">{{ news.content[:150] }}...</p>
+                    </div>
+                </div>
             </div>
         {% else %}
-            <p>Uploaded files இல்லை.</p>
+            <p class="text-center">இப்போது எந்தச் செய்தியும் இல்லை.</p>
         {% endfor %}
     </div>
+</div>
+
+<footer class="text-center bg-dark text-white py-3">
+    &copy; 2025 செய்தி தளம். அனைத்தும் பாதுகாக்கப்பட்டவை.
+</footer>
+
+<script>
+    function viewNews(newsId) {
+        document.body.style.transition = "opacity 0.5s ease-out";
+        document.body.style.opacity = 0;
+        setTimeout(() => {
+            window.location.href = "/news/" + newsId;
+        }, 500);
+    }
+
+    window.onload = () => {
+        document.body.style.opacity = 1;
+    };
+</script>
+
 </body>
 </html>

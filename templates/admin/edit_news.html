@@ -1,0 +1,22 @@
+<!-- templates/admin/edit_news.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit News</title>
+</head>
+<body>
+    <h1>Edit News Post</h1>
+    <form method="POST">
+        <label>Title:</label><br>
+        <input type="text" name="title" value="{{ news.title }}"><br><br>
+
+        <label>Content:</label><br>
+        <textarea name="content" rows="10" cols="50">{{ news.content }}</textarea><br><br>
+
+        <button type="submit">Update News</button>
+    </form>
+    <br>
+    <a href="{{ url_for('admin_dashboard') }}">Back to Admin Dashboard</a>
+</body>
+</html>

@@ -1,210 +1,196 @@
+# Reporter-Driven News Upload System (Flask)
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-# Define base directory
+# Base directory
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Upload folders
+# Folders
 UPLOAD_FOLDER = os.path.join(basedir, 'static', 'uploads')
 COVER_FOLDER = os.path.join(basedir, 'static', 'cover')
 INSTANCE_FOLDER = os.path.join(basedir, 'instance')
 
-# Create necessary folders
+# Ensure directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(COVER_FOLDER, exist_ok=True)
 os.makedirs(INSTANCE_FOLDER, exist_ok=True)
 
-# File type whitelist
-ALLOWED_EXTENSIONS = {
-    'mp4', 'mov', 'avi',
-    'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic',
-    'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'
-}
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov', 'avi'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Admin login credentials
-ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = '1234'
-
-# Database configuration
-db_path = os.path.join(INSTANCE_FOLDER, 'site.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(INSTANCE_FOLDER, 'site.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 
-# Database models
-class Customer(db.Model):
+# ---------------- Database Models ----------------
+class Reporter(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     mobile = db.Column(db.String(15), nullable=False)
+    is_approved = db.Column(db.Boolean, default=False)
+    news = db.relationship('News', backref='reporter', lazy=True)  # Relationship to News
 
-class Request(db.Model):
+class News(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
-    text = db.Column(db.Text, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='Pending')
+    reporter_id = db.Column(db.Integer, db.ForeignKey('reporter.id'), nullable=False)
+    filename = db.Column(db.String(200))
+    approved = db.Column(db.Boolean, default=False)
 
-# Create database tables if not exist
+# ---------------- Initial Setup ----------------
 with app.app_context():
-    print("Creating database tables if not exist...")
     db.create_all()
-    print("Database tables created.")
 
-# Cover photo load
-COVER_PHOTO = None
-cover_path = os.path.join(COVER_FOLDER, 'cover.jpg')
-if os.path.exists(cover_path):
-    COVER_PHOTO = 'cover/cover.jpg'
-
-# -------------------- Routes --------------------
-
+# ---------------- Routes ----------------
 @app.route('/')
 def home():
-    files = os.listdir(UPLOAD_FOLDER)
-    global COVER_PHOTO
-    return render_template('index.html', files=files, cover_photo=COVER_PHOTO)
+    news_items = News.query.filter_by(approved=True).all()
+    return render_template('index.html', news_items=news_items)
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/admin-login', methods=['GET', 'POST'])
+def admin_login():
     if request.method == 'POST':
-        if request.form['username'] == ADMIN_USERNAME and request.form['password'] == ADMIN_PASSWORD:
-            session['admin_logged_in'] = True
-            flash("Admin successfully logged in.", "success")
+        if request.form['username'] == 'admin' and request.form['password'] == '1234':
+            session['admin'] = True
             return redirect(url_for('admin_dashboard'))
         else:
-            flash("தவறான Username அல்லது Password!", "danger")
-    return render_template('login.html')
+            flash("\u0ba4\u0bb5\u0bb1\u0bbe\u0ba9\u0bcd Admin \u0ba4\u0b95\u0bb5\u0bb2\u0bcd", "danger")
+    return render_template('admin/login.html')
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash("Logged out successfully.", "info")
-    return redirect(url_for('home'))
-
-@app.route('/admin')
+@app.route('/admin-dashboard')
 def admin_dashboard():
-    if not session.get('admin_logged_in'):
-        flash("Admin login required!", "warning")
-        return redirect(url_for('login'))
-    files = os.listdir(UPLOAD_FOLDER)
-    requests = Request.query.all()
-    return render_template('admin.html', files=files, requests=requests, cover_photo=COVER_PHOTO)
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
 
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
-    if not session.get('admin_logged_in'):
-        flash("Admin login required!", "warning")
-        return redirect(url_for('login'))
-    if request.method == 'POST':
-        file = request.files.get('file')
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            flash("கோப்பு வெற்றிகரமாக அப்லோட் செய்யப்பட்டது!", "success")
-            return redirect(url_for('admin_dashboard'))
-        else:
-            flash("அனுமதிக்கப்படாத கோப்பு வகை!", "danger")
-    return render_template('upload.html')
+    news_list = News.query.all()
+    pending_reporters = Reporter.query.filter_by(is_approved=False).all()
 
-@app.route('/delete/<filename>', methods=['POST'])
-def delete_file(filename):
-    if not session.get('admin_logged_in'):
-        flash("Admin login required!", "warning")
-        return redirect(url_for('login'))
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        flash(f"{filename} நீக்கப்பட்டது.", "success")
-    else:
-        flash("கோப்பு இல்லை!", "danger")
+    return render_template(
+        'admin/dashboard.html',
+        news_list=news_list,
+        pending_reporters=pending_reporters
+    )
+
+@app.route('/approve/<int:news_id>')
+def approve_news(news_id):
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    news = News.query.get(news_id)
+    news.approved = True
+    db.session.commit()
+    flash("\u0b9a\u0bc6\u0baf\u0bcd\u0ba4\u0bbf \u0b92\u0baa\u0bcd\u0baa\u0bc1\u0ba4\u0bb2\u0bcd \u0baa\u0bc6\u0bb1\u0bcd\u0bb1\u0ba4\u0bc1", "success")
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/upload_cover', methods=['GET', 'POST'])
-def upload_cover():
-    if not session.get('admin_logged_in'):
-        flash("Admin login required!", "warning")
-        return redirect(url_for('login'))
-    global COVER_PHOTO
-    if request.method == 'POST':
-        file = request.files.get('cover_photo')
-        if file and allowed_file(file.filename):
-            filename = 'cover.jpg'
-            file.save(os.path.join(COVER_FOLDER, filename))
-            COVER_PHOTO = 'cover/cover.jpg'
-            flash("Cover photo மாற்றப்பட்டது!", "success")
-            return redirect(url_for('admin_dashboard'))
-        else:
-            flash("அனுமதிக்கப்படாத கோப்பு வகை!", "danger")
-    return render_template('upload_cover.html')
+@app.route('/delete/<int:news_id>')
+def delete_news(news_id):
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    news = News.query.get(news_id)
+    db.session.delete(news)
+    db.session.commit()
+    flash("\u0b9a\u0bc6\u0baf\u0bcd\u0ba4\u0bbf \u0ba8\u0bc0\u0b95\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0ba4\u0bc1", "success")
+    return redirect(url_for('admin_dashboard'))
 
-@app.route('/customer-register', methods=['GET', 'POST'])
-def customer_register():
+@app.route('/edit/<int:news_id>', methods=['GET', 'POST'])
+def edit_news(news_id):
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    news = News.query.get(news_id)
+    if request.method == 'POST':
+        news.title = request.form['title']
+        news.content = request.form['content']
+        db.session.commit()
+        flash("\u0b9a\u0bc6\u0baf\u0bcd\u0ba4\u0bbf \u0ba4\u0bbf\u0bb0\u0bc1\u0ba4\u0bcd\u0ba4\u0baa\u0bcd\u0baa\u0b9f\u0bc1", "success")
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin/edit_news.html', news=news)
+
+@app.route('/news/<int:news_id>')
+def view_news(news_id):
+    news = News.query.get_or_404(news_id)
+    return render_template('view_news.html', news=news)
+
+@app.route('/approve-reporter/<int:reporter_id>')
+def approve_reporter(reporter_id):
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    reporter = Reporter.query.get(reporter_id)
+    reporter.is_approved = True
+    db.session.commit()
+    flash("\u0ba8\u0bbf\u0bb0\u0bc1\u0baa\u0bb0\u0bcd \u0b92\u0baa\u0bcd\u0baa\u0bc1\u0ba4\u0bb2\u0bcd \u0baa\u0bc6\u0bb1\u0bcd\u0bb1\u0bbe\u0bb0\u0bcd", "success")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/reporter-register', methods=['GET', 'POST'])
+def reporter_register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         mobile = request.form['mobile']
-        files = request.files.getlist('files')
-
-        if Customer.query.filter_by(username=username).first():
-            flash("இந்த username ஏற்கனவே உள்ளது.", "danger")
+        if Reporter.query.filter_by(username=username).first():
+            flash("Username \u0b8f\u0bb1\u0bcd\u0b95\u0ba3\u0bc7\u0bb5\u0bc7 \u0b89\u0bb3\u0bcd\u0bb3\u0ba4\u0bc1", "danger")
         else:
-            new_user = Customer(username=username, password=password, mobile=mobile)
-            db.session.add(new_user)
+            db.session.add(Reporter(username=username, password=password, mobile=mobile))
             db.session.commit()
+            flash("\u0baa\u0ba4\u0bbf\u0bb5\u0bc1 \u0bb5\u0bc6\u0bb1\u0bcd\u0bb1\u0bbf\u0b95\u0bb0\u0bae\u0bbe\u0b95 \u0bae\u0bc1\u0b9f\u0bbf\u0ba8\u0bcd\u0ba4\u0ba4\u0bc1! Admin \u0b92\u0baa\u0bcd\u0baa\u0bc1\u0ba4\u0bb2\u0bcd \u0b95\u0bbf\u0b9f\u0bc8\u0b95 \u0bb5\u0bc6\u0ba3\u0bcd\u0b9f\u0bc1\u0bae\u0bcd.", "success")
+            return redirect(url_for('reporter_login'))
+    return render_template('reporter/register.html')
 
-            for file in files:
-                if file and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    file.save(os.path.join(UPLOAD_FOLDER, filename))
-
-            flash("பதிவு வெற்றிகரமாக முடிந்தது. இப்போது login செய்யவும்.", "success")
-            return redirect(url_for('customer_login'))
-    return render_template('customer_register.html')
-
-@app.route('/customer-login', methods=['GET', 'POST'])
-def customer_login():
+@app.route('/reporter-login', methods=['GET', 'POST'])
+def reporter_login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        user = Customer.query.filter_by(username=username, password=password).first()
+        user = Reporter.query.filter_by(username=username, password=password).first()
         if user:
-            session['customer_logged_in'] = True
-            session['customer_id'] = user.id
-            session['customer_username'] = user.username
-            flash("வாழ்த்துக்கள்! உள்நுழைந்தது.", "success")
-            return redirect(url_for('customer_requests'))
-        else:
-            flash("தவறான Username அல்லது Password!", "danger")
-    return render_template('customer_login.html')
+            if not user.is_approved:
+                flash("Admin Approval \u0ba8\u0bbf\u0bb2\u0bc1\u0bb5\u0bc8\u0baf\u0bc7\u0bb1\u0bcd\u0bb1\u0bc1\u0bb2\u0bcd\u0bb3\u0ba4\u0bc1", "warning")
+                return redirect(url_for('reporter_login'))
+            session['reporter'] = user.id
+            return redirect(url_for('submit_news'))
+        flash("\u0ba4\u0bb5\u0bb1\u0bbe\u0ba9 Username/Password", "danger")
+    return render_template('reporter/login.html')
 
-@app.route('/customer-logout')
-def customer_logout():
-    session.pop('customer_logged_in', None)
-    session.pop('customer_id', None)
-    session.pop('customer_username', None)
-    flash("Logged out successfully.", "info")
+@app.route('/submit-news', methods=['GET', 'POST'])
+def submit_news():
+    if 'reporter' not in session:
+        return redirect(url_for('reporter_login'))
+    reporter = Reporter.query.get(session['reporter'])
+    if not reporter.is_approved:
+        flash("Admin Approval \u0baa\u0bc6\u0bb1 \u0b95\u0bc7\u0b9f\u0bc1\u0bae\u0bcd.", "warning")
+        return redirect(url_for('reporter_login'))
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        file = request.files.get('file')
+        filename = None
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+        news = News(title=title, content=content, reporter_id=session['reporter'], filename=filename)
+        db.session.add(news)
+        db.session.commit()
+        flash("\u0b9a\u0bc6\u0baf\u0bcd\u0ba4\u0bbf \u0b9a\u0bae\u0bb0\u0bcd\u0baa\u0bcd\u0baa\u0bbf\u0ba9\u0bcd\u0baa\u0baa\u0bcd\u0baa\u0b9f\u0bc1! Admin \u0b92\u0baa\u0bcd\u0baa\u0bc1\u0ba4\u0bb2\u0bcd \u0baa\u0bbf\u0bb1\u0b95\u0bc1 \u0bb5\u0bc6\u0bb3\u0bbf\u0baf\u0bbf\u0b9f\u0baa\u0bcd\u0baa\u0b9f\u0bc1\u0bae\u0bcd.", "success")
+        return redirect(url_for('submit_news'))
+    return render_template('reporter/submit_news.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash("\u0bb5\u0bc6\u0bb3\u0bbf\u0baf\u0bc7\u0bb1\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0bc1", "info")
     return redirect(url_for('home'))
 
-@app.route('/requests', methods=['GET', 'POST'])
-def customer_requests():
-    if not session.get('customer_logged_in'):
-        flash("Customer login required!", "warning")
-        return redirect(url_for('customer_login'))
-    if request.method == 'POST':
-        text = request.form['request_text']
-        new_request = Request(customer_id=session['customer_id'], text=text)
-        db.session.add(new_request)
-        db.session.commit()
-        flash("கோரிக்கை சமர்ப்பிக்கப்பட்டது!", "success")
-    requests = Request.query.filter_by(customer_id=session['customer_id']).all()
-    return render_template('requests.html', requests=requests)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
